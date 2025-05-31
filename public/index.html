@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Trend Analyzer</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .chart-container {
+                margin: 20px 0;
+                height: 400px;
+            }
+            .input-section {
+                margin-bottom: 20px;
+            }
+            .results-section {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+            .card {
+                border: 1px solid #ddd;
+                padding: 15px;
+                border-radius: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Trend Analyzer</h1>
+
+        <div class="input-section">
+            <input type="text" id="keywords" placeholder="Enter keywords (comma-separated)" />
+            <button onclick="analyzeTrends()">Analyze Trends</button>
+        </div>
+
+        <div class="results-section">
+            <div class="card">
+                <h2>Interest Over Time</h2>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Interest by Region</h2>
+                <div class="chart-container">
+                    <canvas id="regionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Trend Stability</h2>
+                <div id="stabilityResults"></div>
+            </div>
+
+            <div class="card">
+                <h2>Related Queries</h2>
+                <div id="relatedQueries"></div>
+            </div>
+        </div>
+
+        <script>
+            let trendChart;
+            let regionChart;
+
+            async function analyzeTrends() {
+                const keywordsInput = document.getElementById("keywords").value;
+                const keywords = keywordsInput.split(",").map((k) => k.trim());
+
+                try {
+                    const response = await fetch("/analyze", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ keywords }),
+                    });
+
+                    const data = await response.json();
+                    displayResults(data);
+                } catch (error) {
+                    console.error("Error:", error);
+                    alert("Error analyzing trends");
+                }
+            }
+
+            function displayResults(data) {
+                // Display Interest Over Time
+                const timelineData = data.interestOverTime.default.timelineData;
+                const labels = timelineData.map((point) => new Date(point.time * 1000).toLocaleDateString());
+
+                if (trendChart) {
+                    trendChart.destroy();
+                }
+
+                // Get keywords from the input field since they're not in the response
+                const keywords = document
+                    .getElementById("keywords")
+                    .value.split(",")
+                    .map((k) => k.trim());
+
+                trendChart = new Chart(document.getElementById("trendChart"), {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: keywords.map((keyword, index) => ({
+                            label: keyword,
+                            data: timelineData.map((point) => point.value[index]),
+                            borderColor: getRandomColor(),
+                            fill: false,
+                        })),
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                    },
+                });
+
+                // Display Interest by Region
+                if (regionChart) {
+                    regionChart.destroy();
+                }
+
+                const regionData = data.interestByRegion.default.geoMapData
+                    .filter((item) => item.hasData[0])
+                    .sort((a, b) => b.value[0] - a.value[0])
+                    .slice(0, 10);
+
+                regionChart = new Chart(document.getElementById("regionChart"), {
+                    type: "bar",
+                    data: {
+                        labels: regionData.map((item) => item.geoName),
+                        datasets: [
+                            {
+                                label: "Interest by Region",
+                                data: regionData.map((item) => item.value[0]),
+                                backgroundColor: getRandomColor(),
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                            },
+                        },
+                    },
+                });
+
+                // Display Trend Stability
+                const stabilityDiv = document.getElementById("stabilityResults");
+                stabilityDiv.innerHTML = Object.entries(data.trendStability)
+                    .map(([keyword, stability]) => `<p><strong>${keyword}:</strong> ${stability}</p>`)
+                    .join("");
+
+                // Display Related Queries
+                const queriesDiv = document.getElementById("relatedQueries");
+                queriesDiv.innerHTML = Object.entries(data.relatedQueries)
+                    .map(([keyword, queries]) => {
+                        const rising = queries.default.rankedList[0]?.rankedKeyword || [];
+                        return `
+                            <div>
+                                <h3>${keyword}</h3>
+                                <h4>Rising Queries:</h4>
+                                ${
+                                    rising.length > 0
+                                        ? `
+                                    <ul>
+                                        ${rising
+                                            .slice(0, 5)
+                                            .map((q) => `<li>${q.query} (${q.value})</li>`)
+                                            .join("")}
+                                    </ul>
+                                `
+                                        : "<p>No rising queries available</p>"
+                                }
+                            </div>
+                        `;
+                    })
+                    .join("");
+            }
+
+            function getRandomColor() {
+                const letters = "0123456789ABCDEF";
+                let color = "#";
+                for (let i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+        </script>
+    </body>
+</html>

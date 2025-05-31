@@ -1,0 +1,16 @@
+{
+    "name": "trend-analyzer",
+    "version": "1.0.0",
+    "description": "Google Trends and TikTok trend analyzer",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "google-trends-api": "^4.9.2",
+        "express": "^4.18.2",
+        "chart.js": "^4.4.1",
+        "node-fetch": "^2.6.1",
+        "dotenv": "^16.3.1"
+    }
+}
